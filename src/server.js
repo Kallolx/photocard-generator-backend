@@ -1,11 +1,11 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
-require('dotenv').config();
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
+const rateLimit = require("express-rate-limit");
+require("dotenv").config();
 
-const { testConnection } = require('./config/database');
+const { testConnection } = require("./config/database");
 
 // Create Express app
 const app = express();
@@ -14,20 +14,22 @@ const app = express();
 app.use(helmet());
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    credentials: true,
+  }),
+);
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Logging middleware
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
+if (process.env.NODE_ENV === "development") {
+  app.use(morgan("dev"));
 } else {
-  app.use(morgan('combined'));
+  app.use(morgan("combined"));
 }
 
 // Rate limiting
@@ -36,39 +38,40 @@ const limiter = rateLimit({
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
   message: {
     success: false,
-    message: 'Too many requests from this IP, please try again later.'
+    message: "Too many requests from this IP, please try again later.",
   },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
 });
 
-app.use('/api/', limiter);
+app.use("/api/", limiter);
 
 // Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/admin', require('./routes/admin'));
-app.use('/api/user', require('./routes/user'));
-app.use('/api/cards', require('./routes/cards'));
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/admin", require("./routes/admin"));
+app.use("/api/user", require("./routes/user"));
+app.use("/api/cards", require("./routes/cards"));
+app.use("/api/external", require("./routes/externalApiRoutes"));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get("/health", (req, res) => {
   res.json({
     success: true,
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
+    message: "Server is running",
+    timestamp: new Date().toISOString(),
   });
 });
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get("/", (req, res) => {
   res.json({
     success: true,
-    message: 'Newscard API Server',
-    version: '1.0.0',
+    message: "Newscard API Server",
+    version: "1.0.0",
     endpoints: {
-      health: '/health',
-      auth: '/api/auth',
-    }
+      health: "/health",
+      auth: "/api/auth",
+    },
   });
 });
 
@@ -76,18 +79,18 @@ app.get('/', (req, res) => {
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Route not found'
+    message: "Route not found",
   });
 });
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  
+  console.error("Error:", err);
+
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    message: err.message || "Internal server error",
+    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 });
 
@@ -98,16 +101,18 @@ const startServer = async () => {
   try {
     // Test database connection
     const dbConnected = await testConnection();
-    
+
     if (!dbConnected) {
-      console.error('Failed to connect to database. Please check your configuration.');
+      console.error(
+        "Failed to connect to database. Please check your configuration.",
+      );
       process.exit(1);
     }
-    
+
     // Start listening
     app.listen(PORT, () => {
       console.log(`\n🚀 Server running on http://localhost:${PORT}`);
-      console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`📝 Environment: ${process.env.NODE_ENV || "development"}`);
       console.log(`🗄️  Database: ${process.env.DB_NAME}`);
       console.log(`\nAPI Endpoints:`);
       console.log(`   POST   /api/auth/register`);
@@ -120,9 +125,8 @@ const startServer = async () => {
       console.log(`   POST   /api/cards/generate`);
       console.log(`   GET    /api/cards/check-limit\n`);
     });
-    
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 };

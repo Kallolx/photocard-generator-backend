@@ -1,23 +1,23 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { query, transaction } = require('../config/database');
-const { authenticate } = require('../middleware/auth');
+const { query, transaction } = require("../config/database");
+const { authenticate } = require("../middleware/auth");
 
 /**
  * @route   POST /api/user/upgrade-plan
  * @desc    Upgrade user's plan (demo version - no payment)
  * @access  Private
  */
-router.post('/upgrade-plan', authenticate, async (req, res) => {
+router.post("/upgrade-plan", authenticate, async (req, res) => {
   try {
     const { plan } = req.body;
     const userId = req.userId;
 
     // Validate plan
-    if (!['Basic', 'Premium'].includes(plan)) {
+    if (!["Basic", "Premium"].includes(plan)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid plan. Must be Basic or Premium.',
+        message: "Invalid plan. Must be Basic or Premium.",
       });
     }
 
@@ -25,14 +25,19 @@ router.post('/upgrade-plan', authenticate, async (req, res) => {
     await transaction(async (connection) => {
       // Update user's plan
       await connection.execute(
-        'UPDATE users SET plan = ?, plan_status = ?, subscription_start_date = NOW() WHERE id = ?',
-        [plan, 'active', userId]
+        "UPDATE users SET plan = ?, plan_status = ?, subscription_start_date = NOW() WHERE id = ?",
+        [plan, "active", userId],
       );
 
       // Update user credits based on new plan
       const planLimits = {
         Free: { limit: 5, batch: false, custom: false, api: false },
-        Basic: { limit: 15, batch: false, custom: true, api: false }, // Batch is Premium only
+        Basic: {
+          limit: parseInt(process.env.BASIC_PLAN_LIMIT) || 30,
+          batch: false,
+          custom: true,
+          api: false,
+        }, // Batch is Premium only
         Premium: { limit: -1, batch: true, custom: true, api: true }, // -1 = unlimited
       };
 
@@ -45,21 +50,21 @@ router.post('/upgrade-plan', authenticate, async (req, res) => {
           custom_cards_enabled = ?,
           api_access_enabled = ?
         WHERE user_id = ?`,
-        [limits.limit, limits.batch, limits.custom, limits.api, userId]
+        [limits.limit, limits.batch, limits.custom, limits.api, userId],
       );
     });
 
     // Get updated user data
     const users = await query(
-      'SELECT id, name, email, plan, plan_status FROM users WHERE id = ?',
-      [userId]
+      "SELECT id, name, email, plan, plan_status FROM users WHERE id = ?",
+      [userId],
     );
 
     const credits = await query(
       `SELECT daily_limit, cards_generated_today, batch_processing_enabled, 
               custom_cards_enabled, api_access_enabled 
        FROM user_credits WHERE user_id = ?`,
-      [userId]
+      [userId],
     );
 
     res.json({
@@ -76,10 +81,10 @@ router.post('/upgrade-plan', authenticate, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Upgrade plan error:', error);
+    console.error("Upgrade plan error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to upgrade plan',
+      message: "Failed to upgrade plan",
     });
   }
 });
@@ -89,20 +94,20 @@ router.post('/upgrade-plan', authenticate, async (req, res) => {
  * @desc    Get user's current credit status
  * @access  Private
  */
-router.get('/credits', authenticate, async (req, res) => {
+router.get("/credits", authenticate, async (req, res) => {
   try {
     const credits = await query(
       `SELECT daily_limit, cards_generated_today, last_reset_date, 
               total_cards_generated, batch_processing_enabled, 
               custom_cards_enabled, api_access_enabled 
        FROM user_credits WHERE user_id = ?`,
-      [req.userId]
+      [req.userId],
     );
 
     if (credits.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Credits not found',
+        message: "Credits not found",
       });
     }
 
@@ -111,10 +116,10 @@ router.get('/credits', authenticate, async (req, res) => {
       data: credits[0],
     });
   } catch (error) {
-    console.error('Get credits error:', error);
+    console.error("Get credits error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch credits',
+      message: "Failed to fetch credits",
     });
   }
 });
@@ -124,20 +129,20 @@ router.get('/credits', authenticate, async (req, res) => {
  * @desc    Check if user has access to a specific feature
  * @access  Private
  */
-router.get('/features/:feature', authenticate, async (req, res) => {
+router.get("/features/:feature", authenticate, async (req, res) => {
   try {
     const { feature } = req.params;
 
     const credits = await query(
       `SELECT batch_processing_enabled, custom_cards_enabled, api_access_enabled 
        FROM user_credits WHERE user_id = ?`,
-      [req.userId]
+      [req.userId],
     );
 
     if (credits.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'User not found',
+        message: "User not found",
       });
     }
 
@@ -158,12 +163,28 @@ router.get('/features/:feature', authenticate, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Check feature error:', error);
+    console.error("Check feature error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to check feature access',
+      message: "Failed to check feature access",
     });
   }
 });
+
+const userController = require("../controllers/userController");
+
+/**
+ * @route   PUT /api/user/profile
+ * @desc    Update user profile
+ * @access  Private
+ */
+router.put("/profile", authenticate, userController.updateProfile);
+
+/**
+ * @route   PUT /api/user/password
+ * @desc    Change user password
+ * @access  Private
+ */
+router.put("/password", authenticate, userController.changePassword);
 
 module.exports = router;
