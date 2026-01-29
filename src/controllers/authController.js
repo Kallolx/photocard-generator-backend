@@ -78,15 +78,22 @@ const register = [
         // Initialize user credits with Free plan limits
         await connection.execute(
           `INSERT INTO user_credits (
-            user_id, 
-            daily_limit, 
-            cards_generated_today, 
+            user_id,
+            daily_limit,
+            cards_generated_today,
             last_reset_date,
             batch_processing_enabled,
             custom_cards_enabled,
             api_access_enabled
           ) VALUES (?, ?, ?, CURDATE(), ?, ?, ?)`,
           [userId, 5, 0, false, false, false],
+        );
+
+        // Notification
+        await createNotification(
+          "signup",
+          "New User Signup",
+          `User ${name} (${email}) has registered.`,
         );
 
         return { userId };
@@ -282,15 +289,15 @@ const getProfile = async (req, res) => {
 
     // Get credits info
     const credits = await query(
-      `SELECT 
-        daily_limit, 
-        cards_generated_today, 
+      `SELECT
+        daily_limit,
+        cards_generated_today,
         last_reset_date,
         total_cards_generated,
         batch_processing_enabled,
         custom_cards_enabled,
         api_access_enabled
-      FROM user_credits 
+      FROM user_credits
       WHERE user_id = ?`,
       [req.userId],
     );
