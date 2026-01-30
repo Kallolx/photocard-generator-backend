@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { query, transaction } = require("../config/database");
 const { body, validationResult } = require("express-validator");
+const { createNotification } = require("../services/notificationService");
 
 /**
  * Generate JWT tokens

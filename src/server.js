@@ -10,13 +10,16 @@ const { testConnection } = require("./config/database");
 // Create Express app
 const app = express();
 
+// Enable trust proxy for cPanel/LiteSpeed
+app.set("trust proxy", 1);
+
 // Security middleware
 app.use(helmet());
 
 // CORS configuration
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: true, // Allow all origins for debugging
     credentials: true,
   }),
 );
@@ -35,7 +38,7 @@ if (process.env.NODE_ENV === "development") {
 // Rate limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS),
   message: {
     success: false,
     message: "Too many requests from this IP, please try again later.",
@@ -85,7 +88,11 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error("Error:", err);
+  console.error("🔥 Global Error Handler Triggered:");
+  console.error("Query:", req.query);
+  console.error("Body:", req.body);
+  console.error("Error Message:", err.message);
+  console.error("Stack:", err.stack);
 
   res.status(err.status || 500).json({
     success: false,
@@ -109,7 +116,12 @@ const startServer = async () => {
       process.exit(1);
     }
 
-    // Start listening
+    // Only listen if the file is run directly (not required by lsnode)
+    // OR if we are sure lsnode isn't handling it.
+    // However, the error 'listen was called more than once' suggests conflict.
+    // We'll trust the process.env.PORT and ensure we don't listen if the socket is being managed?
+    // Actually, usually simply exporting app is enough for some setups, but let's just clean this up.
+
     app.listen(PORT, () => {
       console.log(`\n🚀 Server running on http://localhost:${PORT}`);
       console.log(`📝 Environment: ${process.env.NODE_ENV || "development"}`);
@@ -131,6 +143,19 @@ const startServer = async () => {
   }
 };
 
-startServer();
+// Only run startServer if not imported OR if we need to force it.
+// The error 'listen called more than once' strongly implies lsnode requires the file AND tries to listen.
+if (require.main === module) {
+  startServer();
+} else {
+  // If required by lsnode, we might still need to connect to DB?
+  // But we shouldn't call app.listen() if lsnode does it.
+  // Let's at least connect to DB.
+  testConnection()
+    .then(() => {
+      console.log("DB Connected via loader");
+    })
+    .catch((err) => console.error("DB Connection Failed:", err));
+}
 
 module.exports = app;
