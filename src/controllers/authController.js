@@ -22,6 +22,22 @@ const generateTokens = (userId) => {
 /**
  * Register new user
  */
+const ALLOWED_DOMAINS = [
+  "gmail.com",
+  "yahoo.com",
+  "hotmail.com",
+  "outlook.com",
+  "live.com",
+  "icloud.com",
+  "me.com",
+  "protonmail.com",
+  "zoho.com",
+  "aol.com",
+  "gmx.com",
+  "mail.com",
+  "yandex.com"
+];
+
 const register = [
   // Validation
   body("name")
@@ -30,8 +46,15 @@ const register = [
     .withMessage("Name must be between 2-255 characters"),
   body("email")
     .isEmail()
+    .withMessage("Valid email is required")
     .normalizeEmail()
-    .withMessage("Valid email is required"),
+    .custom((value) => {
+      const domain = value.split("@")[1];
+      if (!ALLOWED_DOMAINS.includes(domain)) {
+        throw new Error("Please use a common email provider like Gmail, Yahoo, or Outlook.");
+      }
+      return true;
+    }),
   body("password")
     .isLength({ min: 8 })
     .withMessage("Password must be at least 8 characters"),
