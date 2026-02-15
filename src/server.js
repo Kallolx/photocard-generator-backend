@@ -55,6 +55,7 @@ app.use("/api/admin", require("./routes/admin"));
 app.use("/api/user", require("./routes/user"));
 app.use("/api/cards", require("./routes/cards"));
 app.use("/api/external", require("./routes/externalApiRoutes"));
+app.use("/api/bangla", require("./routes/bangla"));
 
 // Health check endpoint
 app.get("/health", (req, res) => {
