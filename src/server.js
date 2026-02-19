@@ -19,10 +19,12 @@ app.use(helmet());
 // CORS configuration
 app.use(
   cors({
-    origin: true,
-    credentials: true,
-  }),
+    origin: ['http://localhost:3000', 'http://api.onedigitalspot.com', 'https://onedigitalspot.com'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true
+  })
 );
+
 
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
