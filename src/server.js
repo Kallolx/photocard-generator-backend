@@ -16,24 +16,13 @@ app.set("trust proxy", 1);
 // Security middleware
 app.use(helmet());
 
-// Handle OPTIONS preflight for all routes
-app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  return res.sendStatus(204);
-});
-
 // CORS configuration
 app.use(
   cors({
-    origin: ['http://localhost:3000', 'http://api.onedigitalspot.com', 'https://onedigitalspot.com'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    credentials: true
-  })
+    origin: true,
+    credentials: true,
+  }),
 );
-
 
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
