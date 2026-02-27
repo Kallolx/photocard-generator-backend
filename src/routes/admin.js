@@ -36,13 +36,11 @@ const requireAdmin = async (req, res, next) => {
  */
 router.get("/users", authenticate, requireAdmin, async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 20,
-      search = "",
-      plan = "all",
-      status = "all",
-    } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search || "";
+    const plan = req.query.plan || "all";
+    const status = req.query.status || "all";
     const offset = (page - 1) * limit;
 
     let whereConditions = [];
@@ -78,7 +76,7 @@ router.get("/users", authenticate, requireAdmin, async (req, res) => {
     // Get users with their credits
     // Get users with their credits and API key status
     const usersQuery = `
-      SELECT 
+      SELECT
         users.id,
         users.name,
         users.email,
@@ -102,7 +100,7 @@ router.get("/users", authenticate, requireAdmin, async (req, res) => {
 
     const users = await query(usersQuery, [
       ...queryParams,
-      parseInt(limit),
+      limit,
       offset,
     ]);
 
@@ -118,8 +116,8 @@ router.get("/users", authenticate, requireAdmin, async (req, res) => {
         users: shapedUsers,
         pagination: {
           total,
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page,
+          limit,
           totalPages: Math.ceil(total / limit),
         },
       },
@@ -143,7 +141,7 @@ router.get("/users/:id", authenticate, requireAdmin, async (req, res) => {
     const userId = req.params.id;
 
     const users = await query(
-      `SELECT 
+      `SELECT
         users.*,
         uc.daily_limit,
         uc.cards_generated_today,
@@ -172,9 +170,9 @@ router.get("/users/:id", authenticate, requireAdmin, async (req, res) => {
 
     // Get user's recent card generations
     const recentCards = await query(
-      `SELECT * FROM card_generations 
-       WHERE user_id = ? 
-       ORDER BY created_at DESC 
+      `SELECT * FROM card_generations
+       WHERE user_id = ?
+       ORDER BY created_at DESC
        LIMIT 10`,
       [userId],
     );
@@ -234,7 +232,7 @@ router.put("/users/:id/plan", authenticate, requireAdmin, async (req, res) => {
       const limits = planLimits[plan];
 
       await connection.execute(
-        `UPDATE user_credits SET 
+        `UPDATE user_credits SET
           daily_limit = ?,
           batch_processing_enabled = ?,
           custom_cards_enabled = ?,

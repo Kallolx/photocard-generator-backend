@@ -3,7 +3,15 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
-require("dotenv").config();
+const path = require('path');
+const result = require("dotenv").config({ path: '/home/azureuser/photocard-generator-backend/.env' });
+
+if (result.error) {
+  console.log("❌ COULD NOT LOAD .ENV FILE:", result.error);
+} else {
+  console.log("✅ .env file loaded successfully from absolute path");
+  console.log("✅ JWT_SECRET status:", process.env.JWT_SECRET ? "DEFINED" : "UNDEFINED");
+}
 
 const { testConnection } = require("./config/database");
 
@@ -13,15 +21,34 @@ const app = express();
 // Enable trust proxy for cPanel/LiteSpeed
 app.set("trust proxy", 1);
 
-// Security middleware
-app.use(helmet());
-
-// CORS configuration
+// CORS configuration - MUST be before other middleware
 app.use(
   cors({
-    origin: true,
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or Postman)
+      if (!origin) return callback(null, true);
+
+      // Allow all origins in development/production
+      // You can restrict this to specific domains if needed
+      callback(null, true);
+    },
     credentials: true,
-  }),
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
+    exposedHeaders: ["Content-Type", "Authorization"],
+    maxAge: 86400, // 24 hours
+  })
+);
+
+// Handle preflight requests
+app.options("*", cors());
+
+// Security middleware - after CORS
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false,
+  })
 );
 
 // Body parsing middleware
