@@ -98,11 +98,7 @@ router.get("/users", authenticate, requireAdmin, async (req, res) => {
       LIMIT ? OFFSET ?
     `;
 
-    const users = await query(usersQuery, [
-      ...queryParams,
-      limit,
-      offset,
-    ]);
+    const users = await query(usersQuery, [...queryParams, limit, offset]);
 
     // Shape the data
     const shapedUsers = users.map((user) => ({
@@ -409,5 +405,114 @@ router.put(
     }
   },
 );
+
+/**
+ * @route   GET /api/admin/ai-usage
+ * @desc    Get AI usage stats for all users
+ * @access  Private (Admin only)
+ */
+router.get("/ai-usage", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search || "";
+    const offset = (page - 1) * limit;
+
+    const searchClause = search
+      ? "AND (u.name LIKE ? OR u.email LIKE ?)"
+      : "";
+    const searchParams = search ? [`%${search}%`, `%${search}%`] : [];
+
+    const [{ total }] = await query(
+      `SELECT COUNT(*) as total FROM users u
+       LEFT JOIN user_credits uc ON u.id = uc.user_id
+       WHERE 1=1 ${searchClause}`,
+      searchParams,
+    );
+
+    const rows = await query(
+      `SELECT
+         u.id,
+         u.name,
+         u.email,
+         u.plan,
+         u.status,
+         COALESCE(uc.ai_enabled, 1) AS ai_enabled,
+         COALESCE(uc.ai_requests_today, 0) AS ai_requests_today,
+         COALESCE(uc.ai_requests_total, 0) AS ai_requests_total,
+         uc.ai_requests_last_reset,
+         u.last_login
+       FROM users u
+       LEFT JOIN user_credits uc ON u.id = uc.user_id
+       WHERE 1=1 ${searchClause}
+       ORDER BY uc.ai_requests_total DESC, u.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...searchParams, limit, offset],
+    );
+
+    // Aggregate totals
+    const [totals] = await query(
+      `SELECT
+         SUM(COALESCE(uc.ai_requests_today, 0)) AS total_today,
+         SUM(COALESCE(uc.ai_requests_total, 0)) AS grand_total,
+         SUM(CASE WHEN COALESCE(uc.ai_enabled, 1) = 0 THEN 1 ELSE 0 END) AS blocked_users
+       FROM users u
+       LEFT JOIN user_credits uc ON u.id = uc.user_id`,
+    );
+
+    res.json({
+      success: true,
+      data: {
+        users: rows,
+        totals,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get AI usage error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch AI usage" });
+  }
+});
+
+/**
+ * @route   PUT /api/admin/users/:id/ai-enabled
+ * @desc    Toggle AI feature on/off for a user
+ * @access  Private (Admin only)
+ */
+router.put("/users/:id/ai-enabled", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { ai_enabled } = req.body;
+
+    if (typeof ai_enabled !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "ai_enabled must be a boolean",
+      });
+    }
+
+    // Upsert the user_credits row in case it doesn't exist yet
+    await query(
+      `INSERT INTO user_credits (user_id, ai_enabled)
+       VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE ai_enabled = ?`,
+      [userId, ai_enabled ? 1 : 0, ai_enabled ? 1 : 0],
+    );
+
+    res.json({
+      success: true,
+      message: `AI ${ai_enabled ? "enabled" : "disabled"} for user`,
+      ai_enabled,
+    });
+  } catch (error) {
+    console.error("Toggle AI error:", error);
+    res.status(500).json({ success: false, message: "Failed to update AI setting" });
+  }
+});
 
 module.exports = router;
